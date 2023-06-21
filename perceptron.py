@@ -2,11 +2,12 @@ import numpy as np
 import random
 
 TEST_SIZE = 0.2
-POPULATION_SIZE = 100
+POPULATION_SIZE = 200
 MAX_GEN = 500
 ELITISM = 0.2
 TOURNAMENT_SIZE = 10
 MUTATE_RATE = 0.3
+CROSSOVER_RATE = 0.4
 
 global TRAIN_SIZE
 TRAIN_SIZE = 0
@@ -49,8 +50,8 @@ def init_population():
     return population
 
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
+# def sigmoid(x):
+#     return 1 / (1 + np.exp(-x))
 
 
 def calculate_fitnesses(population, X, Y):
@@ -80,41 +81,41 @@ def get_parents(population_with_fitnesses):
 
 
 
-def unflatten(child1_genes):
-    shape1 = (16, 64)
-    shape2 = (64, 32)
-    shape3 = (32, 1)
-
-    split1 = shape1[0] * shape1[1]
-    split2 = split1 + shape2[0] * shape2[1]
-
-    genes1 = child1_genes[:split1].reshape(shape1)
-    genes2 = child1_genes[split1:split2].reshape(shape2)
-    genes3 = child1_genes[split2:].reshape(shape3)
-
-    return [genes1, genes2, genes3]
+# def unflatten(child1_genes):
+#     shape1 = (16, 64)
+#     shape2 = (64, 32)
+#     shape3 = (32, 1)
+#
+#     split1 = shape1[0] * shape1[1]
+#     split2 = split1 + shape2[0] * shape2[1]
+#
+#     genes1 = child1_genes[:split1].reshape(shape1)
+#     genes2 = child1_genes[split1:split2].reshape(shape2)
+#     genes3 = child1_genes[split2:].reshape(shape3)
+#
+#     return [genes1, genes2, genes3]
 
 def crossover(parent1, parent2):
-    genes1 = parent1
-    genes2 = parent2
-    split = random.randint(0, len(genes1) - 1)
-    child1_genes = np.concatenate((genes1[:split], genes2[split:]))
-    child2_genes = np.concatenate((genes2[:split], genes1[split:]))
-    child1 = child1_genes.reshape((17, 1))
-    child2 = child2_genes.reshape((17, 1))
+    if random.uniform(0, 1) < CROSSOVER_RATE:
+        genes1 = parent1
+        genes2 = parent2
+        split = random.randint(0, len(genes1) - 1)
+        child1_genes = np.concatenate((genes1[:split], genes2[split:]))
+        child2_genes = np.concatenate((genes2[:split], genes1[split:]))
+        child1 = child1_genes.reshape((17, 1))
+        child2 = child2_genes.reshape((17, 1))
 
-    return child1, child2
+        return child1, child2
+    return parent1, parent2
 
 
 
 def mutate(new_population):
     for index, child in enumerate(new_population):
-        for _ in range(4):
-            if random.uniform(0, 1) < MUTATE_RATE:
-                i = random.randint(0, child.size - 1)
-                child[i] = random.uniform(-1, 1)
-                new_population[index] = child
-
+        if random.uniform(0, 1) < MUTATE_RATE:
+            i = random.randint(0, child.size - 1)
+            child[i] = random.uniform(-1, 1)
+            new_population[index] = child.copy()
     return new_population
 
 
@@ -130,22 +131,23 @@ def genetic_algorithm():
         sorted_population = [np.array(l) for l in tmp]
         sorted_fitness = np.take(fitness_scores, sorted_indices, axis=0)
 
-        best = sorted_fitness[0]
+        best = sorted_fitness[0].copy()
         if best == 1:
             print("you win!!")
             break
 
-        new_population = sorted_population[:round(ELITISM * POPULATION_SIZE)]
-        print(str(gen) + "," + str(best))
+        new_population = sorted_population[:round(ELITISM * POPULATION_SIZE)].copy()
+        print("gen: " + str(gen) + " , hit rate: " + str(best) + " , avg: " + str(np.average(np.array(fitness_scores)))
+              + " , min: " + str(min(fitness_scores)))
 
         while len(new_population) < POPULATION_SIZE:
-            parent1, parent2 = get_parents(list(zip(sorted_population, sorted_fitness)))
-            child1, child2 = crossover(parent1, parent2)
-            new_population.append(child1)
-            new_population.append(child2)
+            parent1, parent2 = get_parents(list(zip(sorted_population, sorted_fitness))[:30])
+            child1, child2 = crossover(parent1.copy(), parent2.copy())
+            new_population.append(child1.copy())
+            new_population.append(child2.copy())
 
-        new_population = mutate(new_population)
-        population = new_population
+        new_population = mutate(new_population.copy())
+        population = new_population.copy()
 
 
 

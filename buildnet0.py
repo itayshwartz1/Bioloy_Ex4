@@ -1,15 +1,20 @@
 import numpy as np
 import random
 
-
-
 TEST_SIZE = 0.2
 POPULATION_SIZE = 100
-MAX_GEN = 200
+MAX_GEN = 500
 ELITISM = 0.1
 TOURNAMENT_SIZE = 10
-MUTATE_RATE = 0.5
+MUTATE_RATE = 0.4
+CROSSOVER_RATE = 0.6
+HIDDEN_LAYERS = [16, 64, 1]
+global TRAIN_SIZE
+TRAIN_SIZE = 0
+
+
 def get_strings():
+    global TRAIN_SIZE
     inputs = []
     labels = []
 
@@ -17,19 +22,21 @@ def get_strings():
         for line in file:
             if line.strip() != "":
                 string, label = line.strip().split()
-                inputs.append(np.array([list(letter) for letter in string], dtype=int).reshape(1, -1))
-                labels.append(int(label))
+                inputs.append(np.array([list(letter) for letter in string], dtype=int).flatten())
+                if label == '1':
+                    labels.append(1)
+                else:
+                    labels.append(-1)
 
     indices = np.arange(len(inputs))
     np.random.shuffle(indices)
     shuffled_inputs = np.take(inputs, indices, axis=0)
     shuffled_labels = np.take(labels, indices, axis=0)
-
-    split_point = int(0.8 * len(inputs))  # 80% for training, 20% for testing
+    TRAIN_SIZE = int(0.8 * len(inputs))  # 80% for training, 20% for testing
 
     # Split the shuffled data into training and testing sets
-    input_train, input_test = shuffled_inputs[:split_point], shuffled_inputs[split_point:]
-    labels_train, labels_test = shuffled_labels[:split_point], shuffled_labels[split_point:]
+    input_train, input_test = shuffled_inputs[:TRAIN_SIZE], shuffled_inputs[TRAIN_SIZE:]
+    labels_train, labels_test = shuffled_labels[:TRAIN_SIZE], shuffled_labels[TRAIN_SIZE:]
 
     return input_train, labels_train, input_test, labels_test
 
@@ -37,10 +44,15 @@ def get_strings():
 def init_population():
     population = []
     for i in range(POPULATION_SIZE):
+        child = []
+        for j in range(len(HIDDEN_LAYERS) - 1):
+            b = np.ones(HIDDEN_LAYERS[j + 1])
+            w = np.random.uniform(-1, 1, size=(HIDDEN_LAYERS[j], HIDDEN_LAYERS[j + 1]))
+            b_and_w = (b, w)
+            child.append(b_and_w)
 
-        population.append([np.random.uniform(-1, 1, size=(16, 64)),
-                           np.random.uniform(-1, 1, size=(64, 32)),
-                           np.random.uniform(-1, 1, size=(32, 1))])
+        population.append(child)
+
     return population
 
 
@@ -48,68 +60,123 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-def calculate_fitnesses(population, input, labels):
+def calculate_fitnesses(population, X, Y):
     fitness_scores = []
-    labels = np.squeeze(labels)
-    for W in population:
-        tmp = input
-        for layer in W:
-            z = np.dot(tmp, layer)
-            a = sigmoid(z)
-            tmp = a
-
-        tmp = np.squeeze(tmp)
-        fitness_scores.append(np.dot(tmp - labels, tmp - labels))
+    for child in population:
+        hits = 0
+        for i, x in enumerate(X):
+            prev = x
+            for b_and_w in child:
+                b = b_and_w[0]
+                w = b_and_w[1]
+                z = np.dot(prev, w) + b
+                a = sigmoid(z)
+                prev = a
+            prev = prev[0]
+            if prev >= 0.5:
+                prev = 1
+            else:
+                prev = -1
+            if prev * Y[i] > 0:
+                hits += 1
+        fitness_scores.append(hits / TRAIN_SIZE)
 
     return fitness_scores
 
 
-def get_parents(population_with_fitnesses):
-    tournament = random.sample(population_with_fitnesses, TOURNAMENT_SIZE)
-    parent1 = min(tournament, key=lambda x: x[1])
-    tournament.remove(parent1)
-    parent2 = min(tournament, key=lambda x: x[1])
+def get_parents(sorted_population, sorted_fitness):
+    parents = random.choices(sorted_population, sorted_fitness, k=2)
+    return parents[0], parents[1]
+    # tournament = random.sample(population_with_fitnesses, TOURNAMENT_SIZE)
+    # sorted_tournament = sorted(tournament, key=lambda x: x[1], reverse=True)[::-1]
+    # parent1 = sorted_tournament[0][0]
+    # parent2 = sorted_tournament[1][0]
+    # return parent1, parent2
 
-    return parent1[0], parent2[0]
 
+# def unflatten(child1_genes):
+#     shape1 = (16, 64)
+#     shape2 = (64, 32)
+#     shape3 = (32, 1)
+#
+#     split1 = shape1[0] * shape1[1]
+#     split2 = split1 + shape2[0] * shape2[1]
+#
+#     genes1 = child1_genes[:split1].reshape(shape1)
+#     genes2 = child1_genes[split1:split2].reshape(shape2)
+#     genes3 = child1_genes[split2:].reshape(shape3)
+#
+#     return [genes1, genes2, genes3]
 
-def unflatten(child1_genes):
-    shape1 = (16, 64)
-    shape2 = (64, 32)
-    shape3 = (32, 1)
-
-    split1 = shape1[0] * shape1[1]
-    split2 = split1 + shape2[0] * shape2[1]
-
-    genes1 = child1_genes[:split1].reshape(shape1)
-    genes2 = child1_genes[split1:split2].reshape(shape2)
-    genes3 = child1_genes[split2:].reshape(shape3)
-
-    return [genes1, genes2, genes3]
 
 def crossover(parent1, parent2):
-    genes1 = np.concatenate([a.flatten() for a in parent1])
-    genes2 = np.concatenate([a.flatten() for a in parent2])
-    split = random.randint(0, len(genes1) - 1)
-    child1_genes = np.asarray(genes1[:split].tolist() + genes2[split:].tolist())
-    child2_genes = np.asarray(genes2[:split].tolist() + genes1[split:].tolist())
-    child1 = unflatten(child1_genes)
-    child2 = unflatten(child2_genes)
+    if random.uniform(0, 1) > CROSSOVER_RATE:
+        return parent1, parent2
+
+    child1 = []
+    child2 = []
+
+    size = len(parent1)
+
+    for i in range(size):
+        b1 = parent1[i][0]
+        b2 = parent2[i][0]
+        w1 = parent1[i][1]
+        w2 = parent2[i][1]
+
+        split_w = random.randint(0, w1.shape[0])
+
+        # child 1
+        new_b1 = b1
+        new_w1 = np.concatenate((w1[split_w:], w2[:split_w]), axis=None).reshape(w1.shape[0], w1.shape[1])
+        b_and_w1 = (new_b1, new_w1)
+        child1.append(b_and_w1)
+
+        # child 2
+        new_b2 = b2
+        new_w2 = np.concatenate((w1[:split_w], w2[split_w:]), axis=None).reshape(w1.shape[0], w1.shape[1])
+        b_and_w2 = (new_b2, new_w2)
+        child2.append(b_and_w2)
 
     return child1, child2
 
 
-def mutate(new_population):
-    for index, child in enumerate(new_population):
-        if random.uniform(0, 1) < MUTATE_RATE:
-            for _ in range(50):
-                m = random.randint(0, len(child) - 1)
-                i = random.randint(0, len(child[m]) - 1)
-                j = random.randint(0, len(child[m][0]) - 1)
-                child[m][i][j] = random.uniform(-1, 1)
-            new_population[index] = child
 
-    return new_population
+    #
+    #
+    # genes1 = np.concatenate([a.flatten() for a in parent1])
+    # genes2 = np.concatenate([a.flatten() for a in parent2])
+    # split = random.randint(0, len(genes1) - 1)
+    # child1_genes = np.asarray(genes1[:split].tolist() + genes2[split:].tolist())
+    # child2_genes = np.asarray(genes2[:split].tolist() + genes1[split:].tolist())
+    # child1 = unflatten(child1_genes)
+    # child2 = unflatten(child2_genes)
+    #
+    # return child1, child2
+
+
+def mutate(child):
+    new_child = []
+    if random.uniform(0, 1) < MUTATE_RATE:
+        for b_and_w in child:
+            b = b_and_w[0]
+            w = b_and_w[1]
+            rows = w.shape[0]
+            cols = w.shape[1]
+            for row in range(rows):
+                for col in range(cols):
+                    r = random.uniform(0, 1)
+                    if r < 0.25:
+                        w[row][col] = 0
+                    elif r < 0.5:
+                        w[row][col] *= (w[row][col] * (-1))  # opposite
+                    elif r < 0.75:
+                        w[row][col] += 0.1  # increase a little
+                    else:
+                        w[row][col] -= 0.1  # decrease a little
+            new_child.append((b, w))
+
+    return new_child
 
 
 def genetic_algorithm():
@@ -118,25 +185,22 @@ def genetic_algorithm():
 
     for gen in range(MAX_GEN):
         fitness_scores = calculate_fitnesses(population, input_train, labels_train)
-        sorted_indices = np.argsort(fitness_scores)
+        sorted_indices = np.argsort(fitness_scores)[::-1]
         sorted_population = np.take(population, sorted_indices, axis=0)
         sorted_fitness = np.take(fitness_scores, sorted_indices, axis=0)
 
-        if sorted_fitness[0] == 0:
+        if sorted_fitness[0] == 1:
             print("you win!!")
             break
 
-        new_population = sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist()
-        print(min(sorted_fitness))
+        new_population = sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist().copy()
+        print(max(sorted_fitness))
         while len(new_population) < POPULATION_SIZE:
-            parent1, parent2 = get_parents(list(zip(sorted_population, sorted_fitness)))
-            child1, child2 = crossover(parent1, parent2)
-            new_population.append(child1)
-            new_population.append(child2)
-
-        new_population = mutate(new_population)
-        population = new_population
-
+            parent1, parent2 = get_parents(sorted_population.copy(), sorted_fitness.copy())
+            child1, child2 = crossover(parent1.copy(), parent2.copy())
+            new_population.append(mutate(child1.copy()))
+            new_population.append(mutate(child2.copy()))
+        population = new_population.copy()
 
 
 if __name__ == "__main__":

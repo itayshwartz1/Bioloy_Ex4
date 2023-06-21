@@ -6,8 +6,9 @@ POPULATION_SIZE = 100
 MAX_GEN = 500
 ELITISM = 0.1
 TOURNAMENT_SIZE = 10
-MUTATE_RATE = 0.4
-CROSSOVER_RATE = 0.6
+MUTATE_RATE_CHILD = 0.4
+MUTATE_RATE_ELITISM = 0.3
+CROSSOVER_RATE = 0.5
 HIDDEN_LAYERS = [16, 64, 1]
 global TRAIN_SIZE
 TRAIN_SIZE = 0
@@ -155,9 +156,9 @@ def crossover(parent1, parent2):
     # return child1, child2
 
 
-def mutate(child):
+def mutate(child, mutate_rate):
     new_child = []
-    if random.uniform(0, 1) < MUTATE_RATE:
+    if random.uniform(0, 1) < mutate_rate:
         for b_and_w in child:
             b = b_and_w[0]
             w = b_and_w[1]
@@ -174,6 +175,8 @@ def mutate(child):
                         w[row][col] += 0.1  # increase a little
                     else:
                         w[row][col] -= 0.1  # decrease a little
+            r = random.uniform(-1 + b[0], 1 + b[0])
+            b = np.array([r] * b.shape[0])
             new_child.append((b, w))
     else:
         return child
@@ -195,16 +198,18 @@ def genetic_algorithm():
             break
 
         tmp_population = sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist().copy()
-        new_population = []
+        best_child = tmp_population[0].copy()
+        new_population = [best_child.copy()]
         for child in tmp_population:
-            new_population.append(mutate(child))
+            new_population.append(mutate(child.copy(), MUTATE_RATE_ELITISM))
+
 
         print(max(sorted_fitness))
         while len(new_population) < POPULATION_SIZE:
             parent1, parent2 = get_parents(sorted_population.copy(), sorted_fitness.copy())
             child1, child2 = crossover(parent1.copy(), parent2.copy())
-            new_population.append(mutate(child1.copy()))
-            new_population.append(mutate(child2.copy()))
+            new_population.append(mutate(child1.copy(), MUTATE_RATE_CHILD))
+            new_population.append(mutate(child2.copy(), MUTATE_RATE_CHILD))
         population = new_population.copy()
 
 

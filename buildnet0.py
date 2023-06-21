@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 import random
 
@@ -6,10 +8,10 @@ POPULATION_SIZE = 100
 MAX_GEN = 500
 ELITISM = 0.1
 TOURNAMENT_SIZE = 10
-MUTATE_RATE_CHILD = 0.4
+MUTATE_RATE_CHILD = 0.4  # 0.1 0.2
 MUTATE_RATE_ELITISM = 0.3
-MUTATE_RATE_BEST = 0.15
-CROSSOVER_RATE = 0.5
+MUTATE_RATE_BEST = 0.05
+CROSSOVER_RATE = 0.6
 HIDDEN_LAYERS = [16, 64, 1]
 global TRAIN_SIZE
 TRAIN_SIZE = 0
@@ -143,20 +145,6 @@ def crossover(parent1, parent2):
     return child1, child2
 
 
-
-    #
-    #
-    # genes1 = np.concatenate([a.flatten() for a in parent1])
-    # genes2 = np.concatenate([a.flatten() for a in parent2])
-    # split = random.randint(0, len(genes1) - 1)
-    # child1_genes = np.asarray(genes1[:split].tolist() + genes2[split:].tolist())
-    # child2_genes = np.asarray(genes2[:split].tolist() + genes1[split:].tolist())
-    # child1 = unflatten(child1_genes)
-    # child2 = unflatten(child2_genes)
-    #
-    # return child1, child2
-
-
 def mutate(child, mutate_rate):
     new_child = []
     if random.uniform(0, 1) < mutate_rate:
@@ -198,21 +186,22 @@ def genetic_algorithm():
             print("you win!!")
             break
 
-        tmp_population = sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist().copy()
+        tmp_population = deepcopy(sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist())
         new_population = []
         for i, child in enumerate(tmp_population):
             if i == 0:
-                new_population.append(mutate(np.copy(child), MUTATE_RATE_ELITISM))
+                # new_population.append(mutate(np.copy(child), MUTATE_RATE_ELITISM))
+                new_population.append(np.copy(child))
                 continue
             new_population.append(mutate(np.copy(child), MUTATE_RATE_ELITISM))
 
         print(max(sorted_fitness))
         while len(new_population) < POPULATION_SIZE:
-            parent1, parent2 = get_parents(sorted_population.copy(), sorted_fitness.copy())
+            parent1, parent2 = get_parents(deepcopy(sorted_population), deepcopy(sorted_fitness.copy()))
             child1, child2 = crossover(np.copy(parent1), np.copy(parent2))
             new_population.append(mutate(np.copy(child1), MUTATE_RATE_CHILD))
             new_population.append(mutate(np.copy(child2), MUTATE_RATE_CHILD))
-        population = new_population.copy()
+        population = deepcopy(new_population)
 
 
 if __name__ == "__main__":

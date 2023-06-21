@@ -111,7 +111,7 @@ def get_parents(sorted_population, sorted_fitness):
 
 def crossover(parent1, parent2):
     if random.uniform(0, 1) > CROSSOVER_RATE:
-        return parent1, parent2
+        return parent1.tolist(), parent2.tolist()
 
     child1 = []
     child2 = []
@@ -175,7 +175,8 @@ def mutate(child):
                     else:
                         w[row][col] -= 0.1  # decrease a little
             new_child.append((b, w))
-
+    else:
+        return child
     return new_child
 
 
@@ -193,7 +194,11 @@ def genetic_algorithm():
             print("you win!!")
             break
 
-        new_population = sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist().copy()
+        tmp_population = sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist().copy()
+        new_population = []
+        for child in tmp_population:
+            new_population.append(mutate(child))
+
         print(max(sorted_fitness))
         while len(new_population) < POPULATION_SIZE:
             parent1, parent2 = get_parents(sorted_population.copy(), sorted_fitness.copy())

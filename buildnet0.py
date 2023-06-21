@@ -8,6 +8,7 @@ ELITISM = 0.1
 TOURNAMENT_SIZE = 10
 MUTATE_RATE_CHILD = 0.4
 MUTATE_RATE_ELITISM = 0.3
+MUTATE_RATE_BEST = 0.15
 CROSSOVER_RATE = 0.5
 HIDDEN_LAYERS = [16, 64, 1]
 global TRAIN_SIZE
@@ -198,18 +199,19 @@ def genetic_algorithm():
             break
 
         tmp_population = sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist().copy()
-        best_child = tmp_population[0].copy()
-        new_population = [best_child.copy()]
-        for child in tmp_population:
-            new_population.append(mutate(child.copy(), MUTATE_RATE_ELITISM))
-
+        new_population = []
+        for i, child in enumerate(tmp_population):
+            if i == 0:
+                new_population.append(mutate(np.copy(child), MUTATE_RATE_ELITISM))
+                continue
+            new_population.append(mutate(np.copy(child), MUTATE_RATE_ELITISM))
 
         print(max(sorted_fitness))
         while len(new_population) < POPULATION_SIZE:
             parent1, parent2 = get_parents(sorted_population.copy(), sorted_fitness.copy())
-            child1, child2 = crossover(parent1.copy(), parent2.copy())
-            new_population.append(mutate(child1.copy(), MUTATE_RATE_CHILD))
-            new_population.append(mutate(child2.copy(), MUTATE_RATE_CHILD))
+            child1, child2 = crossover(np.copy(parent1), np.copy(parent2))
+            new_population.append(mutate(np.copy(child1), MUTATE_RATE_CHILD))
+            new_population.append(mutate(np.copy(child2), MUTATE_RATE_CHILD))
         population = new_population.copy()
 
 

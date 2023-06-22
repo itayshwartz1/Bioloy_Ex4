@@ -6,13 +6,13 @@ import random
 TEST_SIZE = 0.2
 POPULATION_SIZE = 100
 MAX_GEN = 500
-ELITISM = 0.05
+ELITISM = 0.1
 TOURNAMENT_SIZE = 10
-MUTATE_RATE_CHILD = 0.3  # 0.1 0.2
-MUTATE_RATE_ELITISM = 0.2
-MUTATE_RATE_BEST = 0.1
-CROSSOVER_RATE = 1
-HIDDEN_LAYERS = [16, 10, 1] # 32, no mutate to best -> 0.93, 0.05 0.1 0.2 -> mutates
+MUTATE_RATE_CHILD = 0.4  # 0.1 0.2
+MUTATE_RATE_ELITISM = 0.3
+MUTATE_RATE_BEST = 0.05
+CROSSOVER_RATE = 0.6
+HIDDEN_LAYERS = [16, 1] #16, 10 ,6, 4, 1
 global TRAIN_SIZE
 TRAIN_SIZE = 0
 
@@ -50,7 +50,8 @@ def init_population():
     for i in range(POPULATION_SIZE):
         child = []
         for j in range(len(HIDDEN_LAYERS) - 1):
-            b = np.ones(HIDDEN_LAYERS[j + 1])
+            r = random.uniform(-5, 5)
+            b = np.array([r] * HIDDEN_LAYERS[j + 1])
             w = np.random.uniform(-1, 1, size=(HIDDEN_LAYERS[j], HIDDEN_LAYERS[j + 1]))
             b_and_w = (b, w)
             child.append(b_and_w)
@@ -172,16 +173,9 @@ def mutate(child, mutate_rate):
     return new_child
 
 
-def test_net(param, input_test, labels_test):
-    res = calculate_fitnesses([param], input_test, labels_test)
-    print("test on the best weights is:" + str(res[0]))
-
-
 def genetic_algorithm():
-    global MUTATE_RATE_CHILD, MUTATE_RATE_ELITISM, MUTATE_RATE_BEST
     input_train, labels_train, input_test, labels_test = get_strings()
     population = init_population()
-    stack = []
 
     for gen in range(MAX_GEN):
         fitness_scores = calculate_fitnesses(population, input_train, labels_train)
@@ -193,55 +187,22 @@ def genetic_algorithm():
             print("you win!!")
             break
 
-        best_bal = max(sorted_fitness)
-        stack.append(best_bal)
-
-        local_max = False
-        if (len(stack) == 11) and (min(stack) == max(stack)):
-            MUTATE_RATE_BEST = 0.4
-            MUTATE_RATE_ELITISM = 0.5
-            MUTATE_RATE_CHILD = 0.6
-            local_max = True
-            stack.remove(stack[0])
-            print("local max")
-        elif len(stack) == 11:
-            # maintain only 10
-            stack.remove(stack[0])
-            print("fixing stack")
-        print(stack)
-
         tmp_population = deepcopy(sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist())
         new_population = []
         for i, child in enumerate(tmp_population):
             if i == 0:
                 # new_population.append(mutate(np.copy(child), MUTATE_RATE_ELITISM))
-                new_population.append(mutate(np.copy(child), MUTATE_RATE_BEST))
+                new_population.append(np.copy(child))
                 continue
             new_population.append(mutate(np.copy(child), MUTATE_RATE_ELITISM))
 
-
-        print("gen: " + str(gen) + ", best hit rate: " + str(best_bal))
+        print(max(sorted_fitness))
         while len(new_population) < POPULATION_SIZE:
-            parent1, parent2 = get_parents(
-                deepcopy(sorted_population[:round(ELITISM * POPULATION_SIZE)]),
-                deepcopy(sorted_fitness[:round(ELITISM * POPULATION_SIZE)]))
+            parent1, parent2 = get_parents(deepcopy(sorted_population), deepcopy(sorted_fitness.copy()))
             child1, child2 = crossover(np.copy(parent1), np.copy(parent2))
             new_population.append(mutate(np.copy(child1), MUTATE_RATE_CHILD))
             new_population.append(mutate(np.copy(child2), MUTATE_RATE_CHILD))
         population = deepcopy(new_population)
-
-        if local_max:
-            MUTATE_RATE_CHILD = 0.3
-            MUTATE_RATE_ELITISM = 0.2
-            MUTATE_RATE_BEST = 0.1
-
-
-
-    test_net(sorted_population[0], input_test, labels_test)
-    with open("wnet0.npy", 'wb') as f:
-        np.save(f, sorted_population[0])
-
-
 
 
 if __name__ == "__main__":

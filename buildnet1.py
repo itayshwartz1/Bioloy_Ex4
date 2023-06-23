@@ -3,22 +3,25 @@ from copy import deepcopy
 import numpy as np
 import random
 
-TEST_SIZE = 0.2
 POPULATION_SIZE = 100
-MAX_GEN = 500
+MAX_GEN = 50
 ELITISM = 0.05
 TOURNAMENT_SIZE = 10
 MUTATE_RATE_CHILD = 0.3  # 0.1 0.2
 MUTATE_RATE_ELITISM = 0.2
 MUTATE_RATE_BEST = 0.1
 CROSSOVER_RATE = 1
-HIDDEN_LAYERS = [16, 10, 1] # 32, no mutate to best -> 0.93, 0.05 0.1 0.2 -> mutates
+HIDDEN_LAYERS = [16, 64, 16, 1]
 global TRAIN_SIZE
 TRAIN_SIZE = 0
+global TEST_SIZE
+TEST_SIZE = 0
+
 
 
 def get_strings():
     global TRAIN_SIZE
+    global TEST_SIZE
     inputs = []
     labels = []
 
@@ -37,6 +40,7 @@ def get_strings():
     shuffled_inputs = np.take(inputs, indices, axis=0)
     shuffled_labels = np.take(labels, indices, axis=0)
     TRAIN_SIZE = int(0.8 * len(inputs))  # 80% for training, 20% for testing
+    TEST_SIZE = int(0.2 * len(inputs))  # 80% for training, 20% for testing
 
     # Split the shuffled data into training and testing sets
     input_train, input_test = shuffled_inputs[:TRAIN_SIZE], shuffled_inputs[TRAIN_SIZE:]
@@ -91,26 +95,7 @@ def calculate_fitnesses(population, X, Y):
 def get_parents(sorted_population, sorted_fitness):
     parents = random.choices(sorted_population, sorted_fitness, k=2)
     return parents[0], parents[1]
-    # tournament = random.sample(population_with_fitnesses, TOURNAMENT_SIZE)
-    # sorted_tournament = sorted(tournament, key=lambda x: x[1], reverse=True)[::-1]
-    # parent1 = sorted_tournament[0][0]
-    # parent2 = sorted_tournament[1][0]
-    # return parent1, parent2
 
-
-# def unflatten(child1_genes):
-#     shape1 = (16, 64)
-#     shape2 = (64, 32)
-#     shape3 = (32, 1)
-#
-#     split1 = shape1[0] * shape1[1]
-#     split2 = split1 + shape2[0] * shape2[1]
-#
-#     genes1 = child1_genes[:split1].reshape(shape1)
-#     genes2 = child1_genes[split1:split2].reshape(shape2)
-#     genes3 = child1_genes[split2:].reshape(shape3)
-#
-#     return [genes1, genes2, genes3]
 
 
 def crossover(parent1, parent2):
@@ -173,8 +158,25 @@ def mutate(child, mutate_rate):
 
 
 def test_net(param, input_test, labels_test):
-    res = calculate_fitnesses([param], input_test, labels_test)
-    print("test on the best weights is:" + str(res[0]))
+    global TEST_SIZE
+    hits = 0
+    for i, x in enumerate(input_test):
+        prev = x
+        for b_and_w in param:
+            b = b_and_w[0]
+            w = b_and_w[1]
+            z = np.dot(prev, w) + b
+            a = sigmoid(z)
+            prev = a
+        prev = prev[0]
+        if prev >= 0.5:
+            prev = 1
+        else:
+            prev = -1
+        if prev * labels_test[i] > 0:
+            hits += 1
+
+    return hits / TEST_SIZE
 
 
 def genetic_algorithm():

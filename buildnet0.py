@@ -3,9 +3,8 @@ from copy import deepcopy
 import numpy as np
 import random
 
-TEST_SIZE = 0.2
 POPULATION_SIZE = 100
-MAX_GEN = 500
+MAX_GEN = 50
 ELITISM = 0.05
 TOURNAMENT_SIZE = 10
 MUTATE_RATE_CHILD = 0.3  # 0.1 0.2
@@ -15,10 +14,13 @@ CROSSOVER_RATE = 1
 HIDDEN_LAYERS = [16, 10, 1] # 32, no mutate to best -> 0.93, 0.05 0.1 0.2 -> mutates
 global TRAIN_SIZE
 TRAIN_SIZE = 0
+global TEST_SIZE
+TEST_SIZE = 0
 
 
 def get_strings():
     global TRAIN_SIZE
+    global TEST_SIZE
     inputs = []
     labels = []
 
@@ -37,6 +39,7 @@ def get_strings():
     shuffled_inputs = np.take(inputs, indices, axis=0)
     shuffled_labels = np.take(labels, indices, axis=0)
     TRAIN_SIZE = int(0.8 * len(inputs))  # 80% for training, 20% for testing
+    TEST_SIZE = int(0.2 * len(inputs))
 
     # Split the shuffled data into training and testing sets
     input_train, input_test = shuffled_inputs[:TRAIN_SIZE], shuffled_inputs[TRAIN_SIZE:]
@@ -173,8 +176,25 @@ def mutate(child, mutate_rate):
 
 
 def test_net(param, input_test, labels_test):
-    res = calculate_fitnesses([param], input_test, labels_test)
-    print("test on the best weights is:" + str(res[0]))
+    global TEST_SIZE
+    hits = 0
+    for i, x in enumerate(input_test):
+        prev = x
+        for b_and_w in param:
+            b = b_and_w[0]
+            w = b_and_w[1]
+            z = np.dot(prev, w) + b
+            a = sigmoid(z)
+            prev = a
+        prev = prev[0]
+        if prev >= 0.5:
+            prev = 1
+        else:
+            prev = -1
+        if prev * labels_test[i] > 0:
+            hits += 1
+
+    return hits / TEST_SIZE
 
 
 def genetic_algorithm():
@@ -209,7 +229,6 @@ def genetic_algorithm():
             stack.remove(stack[0])
             print("fixing stack")
         print(stack)
-
         tmp_population = deepcopy(sorted_population[:round(ELITISM * POPULATION_SIZE)].tolist())
         new_population = []
         for i, child in enumerate(tmp_population):
@@ -237,7 +256,8 @@ def genetic_algorithm():
 
 
 
-    test_net(sorted_population[0], input_test, labels_test)
+    test_res = test_net(sorted_population[0], input_test, labels_test)
+    print("the test is: " + str(test_res))
     with open("wnet0.npy", 'wb') as f:
         np.save(f, sorted_population[0])
 
